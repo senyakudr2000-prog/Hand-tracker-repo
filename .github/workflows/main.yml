@@ -1,0 +1,39 @@
+name: Build from zip
+on:
+  workflow_dispatch:
+  push:
+    paths: ['*.zip']
+permissions:
+  contents: write
+jobs:
+  mod:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: for f in *.zip; do unzip -q "$f"; done
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 21 }
+      - uses: gradle/actions/setup-gradle@v4
+        with: { gradle-version: '8.12' }
+      - run: gradle -p handtrack-repo/mod build --no-daemon --stacktrace
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: mod-${{ github.run_number }}
+          files: handtrack-repo/mod/build/libs/handtrack-*.jar
+  app:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: for f in *.zip; do unzip -q "$f"; done
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 17 }
+      - uses: gradle/actions/setup-gradle@v4
+        with: { gradle-version: '8.12' }
+      - run: |
+          mkdir -p handtrack-repo/android/app/src/main/assets
+          curl -L -o handtrack-repo/android/app/src/main/assets/hand_landmarker.task https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task
+      - run: gradle -p handtrack-repo/android assembleDebug --no-daemon
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: app-${{ github.run_number }}
+          files: handtrack-repo/android/app/build/outputs/apk/debug/app-debug.apk
